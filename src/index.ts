@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -8,6 +9,17 @@ const BURNT_TOKEN_ADDRESS = "burnt3JjFJvvAbKznwrDKxW5U9ZcsKUuCyJVCjKdSVB";
 const MAX_SUPPLY = 999999999;
 const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
 const allowedDomains = ["https://burnt.fun"];
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 150, // Limit each IP to 100 requests per windowMs
+  message: {
+    error: "Too many requests from this IP, please try again after 15 minutes.",
+  },
+});
+
+// Apply rate limiter to all routes
+app.use(limiter);
 
 app.use(
   cors({
