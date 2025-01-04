@@ -12,7 +12,7 @@ const allowedDomains = ["https://burnt.fun"];
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 150, // Limit each IP to 100 requests per windowMs
+  max: 150, // Limit each IP to 150 requests per windowMs
   message: {
     error: "Too many requests from this IP, please try again after 15 minutes.",
   },
@@ -33,6 +33,13 @@ app.use(
   })
 );
 
+// Cache to store the last successful price and market cap
+let cache = {
+  price: 0,
+  marketCap: 0,
+  lastUpdated: 0,
+};
+
 // Helper function to fetch market data from CoinGecko
 async function fetchMarketData(): Promise<{
   price: number;
@@ -42,13 +49,30 @@ async function fetchMarketData(): Promise<{
     const response = await fetch(
       "https://api.coingecko.com/api/v3/coins/burnt-fun"
     );
+
+    if (!response.ok) {
+      throw new Error(`CoinGecko API error: ${response.statusText}`);
+    }
+
     const data = await response.json();
-    const price = data.market_data.current_price.usd || 0;
-    const marketCap = data.market_data.market_cap.usd || 0;
+    const price = data.market_data?.current_price?.usd || 0;
+    const marketCap = data.market_data?.market_cap?.usd || 0;
+
+    // Update cache if the data is valid
+    if (price > 0 && marketCap > 0) {
+      cache = {
+        price,
+        marketCap,
+        lastUpdated: Date.now(),
+      };
+    }
+
     return { price, marketCap };
   } catch (error) {
     console.error("Error fetching market data:", error);
-    return { price: 0, marketCap: 0 };
+
+    // Use cached data as a fallback
+    return { price: cache.price, marketCap: cache.marketCap };
   }
 }
 
@@ -105,6 +129,7 @@ app.get(
         maxSupply: formatNumber(MAX_SUPPLY),
         price: formatPrice(price),
         marketCap: formatPrice(marketCap),
+        lastUpdated: new Date(cache.lastUpdated).toISOString(),
       });
     } catch (error) {
       console.error("Error fetching Burnt Token data:", error);
